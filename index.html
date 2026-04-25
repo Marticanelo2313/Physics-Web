@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Sandbox v16 FULL REBUILD</title>
+
+<style>
+body { margin:0; overflow:hidden; background:#0f0f1a; }
+canvas { display:block; }
+
+#ui{
+ position:fixed;
+ top:10px; left:10px;
+ background:rgba(0,0,0,0.75);
+ padding:10px;
+ border-radius:10px;
+ color:white;
+ font-family:Arial;
+}
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+<select id="mode">
+ <option value="sand">Arena</option>
+ <option value="water">Agua</option>
+ <option value="lava">Lava</option>
+ <option value="electric">Electricidad</option>
+ <option value="bomb">Bomba</option>
+ <option value="frag">Frag</option>
+ <option value="inc">Incendiaria</option>
+ <option value="erase">Borrar</option>
+</select>
+
+<br>
+Gravedad:
+<input id="g" type="range" min="0" max="2" step="0.1" value="1">
+</div>
+
+<canvas id="c"></canvas>
+
+<script>
+(() => {
+
+const c = document.getElementById("c");
+const ctx = c.getContext("2d");
+
+function resize(){
+ c.width = innerWidth;
+ c.height = innerHeight;
+}
+resize();
+addEventListener("resize", resize);
+
+// 🧠 GRID
+const s = 4;
+let cols, rows;
+let g;
+
+function init(){
+ cols = Math.floor(c.width/s);
+ rows = Math.floor(c.height/s);
+
+ g = Array.from({length:cols}, ()=>Array(rows).fill(null));
+
+ // suelo estable
+ for(let x=0;x<cols;x++){
+  g[x][rows-1] = "sand";
+ }
+}
+init();
+addEventListener("resize", init);
+
+// 🌍 gravedad
+let gravity = 1;
+document.getElementById("g").oninput = e=>{
+ gravity = parseFloat(e.target.value);
+};
+
+// 🎮 input
+let mouse = {x:0,y:0,down:false};
+let mode = "sand";
+
+document.getElementById("mode").onchange = e=>{
+ mode = e.target.value;
+};
+
+addEventListener("mousemove", e=>{
+ mouse.x = e.clientX;
+ mouse.y = e.clientY;
+});
+
+addEventListener("mousedown", ()=>mouse.down = true);
+addEventListener("mouseup", ()=>mouse.down = false);
+
+// 🧱 safe
+function get(x,y){
+ if(x<0||y<0||x>=cols||y>=rows) return null;
+ return g[x][y];
+}
+function set(x,y,v){
+ if(x<0||y<0||x>=cols||y>=rows) return;
+ g[x][y] = v;
+}
+
+// 💣 explosión
+function explode(x,y,r,type){
+
+ for(let i=x-r;i<x+r;i++){
+  for(let j=y-r;j<y+r;j++){
+
+   let cell = get(i,j);
+   if(!cell) continue;
+
+   let dx=i-x;
+   let dy=j-y;
+   let d=Math.sqrt(dx*dx+dy*dy);
+
+   if(d<r){
+
+    let f=(r-d)/r;
+
+    let nx=i+Math.round(dx*f*4);
+    let ny=j+Math.round(dy*f*4);
+
+    if(get(nx,ny)!==null){
+     set(nx,ny,cell);
+     set(i,j,null);
+    }
+
+    if(type==="frag") set(i,j,"electric");
+    if(type==="inc") set(i,j,"fire");
+   }
+  }
+ }
+}
+
+// ⚡ electricidad
+function electric(x,y){
+
+ let dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+
+ for(let d of dirs){
+  let nx=x+d[0], ny=y+d[1];
+
+  if(get(nx,ny) && Math.random()<0.25){
+   set(nx,ny,"electric");
+  }
+ }
+}
+
+// 🌍 UPDATE
+function update(){
+
+ for(let y=rows-2;y>=0;y--){
+  for(let x=0;x<cols;x++){
+
+   let c = g[x][y];
+   if(!c) continue;
+
+   let below = get(x,y+1);
+
+   // 🧱 arena
+   if(c==="sand"){
+    if(!below){
+     set(x,y+1,"sand");
+     set(x,y,null);
+    } else {
+     let d=Math.random()<0.5?-1:1;
+     if(!get(x+d,y+1)){
+      set(x+d,y+1,"sand");
+      set(x,y,null);
+     }
+    }
+   }
+
+   // 🌊 agua
+   if(c==="water"){
+    if(!below){
+     set(x,y+1,"water");
+     set(x,y,null);
+    } else {
+     let d=Math.random()<0.5?-1:1;
+     if(!get(x+d,y)){
+      set(x+d,y,"water");
+      set(x,y,null);
+     }
+    }
+   }
+
+   // 🌋 lava
+   if(c==="lava"){
+    if(!below){
+     set(x,y+1,"lava");
+     set(x,y,null);
+    } else {
+     let d=Math.random()<0.5?-1:1;
+     if(!get(x+d,y)){
+      set(x+d,y,"lava");
+      set(x,y,null);
+     }
+    }
+
+    if(get(x,y+1)==="water"){
+     set(x,y+1,"stone");
+     set(x,y,"stone");
+    }
+   }
+
+   // ⚡ electricidad
+   if(c==="electric"){
+    electric(x,y);
+    if(Math.random()<0.05) set(x,y,null);
+   }
+
+  }
+ }
+}
+
+// 🎨 draw
+function draw(){
+
+ ctx.fillStyle="#0f0f1a";
+ ctx.fillRect(0,0,c.width,c.height);
+
+ for(let x=0;x<cols;x++){
+  for(let y=0;y<rows;y++){
+
+   let v = g[x][y];
+   if(!v) continue;
+
+   ctx.fillStyle =
+    v==="sand"?"#d2b48c":
+    v==="water"?"cyan":
+    v==="lava"?"orange":
+    v==="electric"?"yellow":
+    v==="stone"?"gray":
+    v==="fire"?"red":"white";
+
+   ctx.fillRect(x*s,y*s,s,s);
+  }
+ }
+}
+
+// 🖱️ tool
+setInterval(()=>{
+
+ if(!mouse.down) return;
+
+ let gx=Math.floor(mouse.x/s);
+ let gy=Math.floor(mouse.y/s);
+
+ if(mode==="erase"){
+  set(gx,gy,null);
+  return;
+ }
+
+ set(gx,gy,mode);
+
+ if(mode==="bomb") explode(gx,gy,18,"bomb");
+ if(mode==="frag") explode(gx,gy,18,"frag");
+ if(mode==="inc") explode(gx,gy,18,"inc");
+
+},16);
+
+// loop
+function loop(){
+ update();
+ draw();
+ requestAnimationFrame(loop);
+}
+loop();
+
+})();
+</script>
+
+</body>
+</html>
