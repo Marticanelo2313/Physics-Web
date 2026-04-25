@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>The Physics Web v18.1</title>
+<title>The Physics Web v27</title>
 
 <style>
 body { margin:0; overflow:hidden; background:#0f0f1a; font-family:Arial; }
@@ -29,15 +29,16 @@ h1{
 
 <body>
 
-<h1>THE PHYSICS WEB v18.1</h1>
+<h1>THE PHYSICS WEB v27</h1>
 
 <div id="ui">
 <select id="mode">
 <option value="sand">Arena</option>
 <option value="water">Agua</option>
 <option value="lava">Lava</option>
-<option value="fire">Fuego</option>
-<option value="electric">Electricidad</option>
+<option value="stone">🪨 Piedra</option>
+<option value="fire">🔥 Fuego</option>
+<option value="electric">⚡ Electricidad</option>
 <option value="bomb">💣 Bomba</option>
 <option value="erase">🧽 Borrar</option>
 </select>
@@ -47,80 +48,99 @@ Tamaño:
 <input id="size" type="range" min="1" max="8" value="2">
 
 <br><br>
-<button id="resetBtn">Reset</button>
+<button id="reset">Reset</button>
 </div>
 
 <canvas id="c"></canvas>
 
 <script>
+(() => {
 
-let c = document.getElementById("c");
-let ctx = c.getContext("2d");
+const c=document.getElementById("c");
+const ctx=c.getContext("2d");
 
-let s = 4;
-let cols, rows;
-let grid;
+let s=4;
+let cols,rows;
+let g;
+let wall;
 
 function resize(){
- c.width = innerWidth;
- c.height = innerHeight;
+ c.width=innerWidth;
+ c.height=innerHeight;
 }
 resize();
-window.addEventListener("resize", resize);
+addEventListener("resize",resize);
 
-// INIT GLOBAL (IMPORTANTE)
+// 🧱 INIT
 function init(){
- cols = Math.floor(c.width/s);
- rows = Math.floor(c.height/s);
+ cols=Math.floor(c.width/s);
+ rows=Math.floor(c.height/s);
 
- grid = Array.from({length:cols}, ()=>Array(rows).fill(null));
+ g=Array.from({length:cols},()=>Array(rows).fill(null));
+ wall=Array.from({length:cols},()=>Array(rows).fill(false));
 
  for(let x=0;x<cols;x++){
-  grid[x][rows-1] = "sand";
+  for(let y=0;y<rows;y++){
+   if(x===0||y===0||x===cols-1||y===rows-1){
+    wall[x][y]=true;
+   }
+  }
+ }
+
+ for(let x=1;x<cols-1;x++){
+  g[x][rows-2]="stone";
  }
 }
 init();
 
-document.getElementById("resetBtn").onclick = init;
+document.getElementById("reset").onclick=init;
 
 // INPUT
 let mouse={x:0,y:0,down:false};
 let mode="sand";
-let size=2;
+let brush=2;
 
 document.getElementById("mode").onchange=e=>mode=e.target.value;
-document.getElementById("size").oninput=e=>size=parseInt(e.target.value);
+document.getElementById("size").oninput=e=>brush=parseInt(e.target.value);
 
-window.addEventListener("mousemove",e=>{
+addEventListener("mousemove",e=>{
  mouse.x=e.clientX;
  mouse.y=e.clientY;
 });
-window.addEventListener("mousedown",()=>mouse.down=true);
-window.addEventListener("mouseup",()=>mouse.down=false);
+addEventListener("mousedown",()=>mouse.down=true);
+addEventListener("mouseup",()=>mouse.down=false);
 
 // SAFE
 function get(x,y){
- if(x<0||y<0||x>=cols||y>=rows) return null;
- return grid[x][y];
-}
-function set(x,y,v){
- if(x<0||y<0||x>=cols||y>=rows) return;
- grid[x][y]=v;
+ if(x<0||y<0||x>=cols||y>=rows) return "wall";
+ if(wall[x][y]) return "wall";
+ return g[x][y];
 }
 
-// BOMBA
+function set(x,y,v){
+ if(x<=0||y<=0||x>=cols-1||y>=rows-1) return;
+ if(wall[x][y]) return;
+ g[x][y]=v;
+}
+
+// 💣 EXPLOSION
 function explode(cx,cy,r){
  for(let x=cx-r;x<cx+r;x++){
   for(let y=cy-r;y<cy+r;y++){
+
+   let cell=get(x,y);
+   if(cell==="stone") continue;
+
    let dx=x-cx, dy=y-cy;
    let d=Math.sqrt(dx*dx+dy*dy);
+
    if(d<r){
     let f=(r-d)/r;
-    let nx=x+Math.round(dx*f*3);
-    let ny=y+Math.round(dy*f*3);
 
-    let cell=get(x,y);
-    if(cell && get(nx,ny)!==null){
+    let nx=x+Math.round(dx*f*5);
+    let ny=y+Math.round(dy*f*5);
+
+    if(get(nx,ny)!=="stone"){
      set(nx,ny,cell);
      set(x,y,null);
     }
@@ -129,64 +149,100 @@ function explode(cx,cy,r){
  }
 }
 
-// ELECTRICIDAD
+// ⚡ ELECTRICIDAD
 function electric(x,y){
  let dirs=[[1,0],[-1,0],[0,1],[0,-1]];
  for(let d of dirs){
   let nx=x+d[0], ny=y+d[1];
-  if(get(nx,ny) && Math.random()<0.2){
+  if(get(nx,ny) && Math.random()<0.12){
    set(nx,ny,"electric");
   }
  }
 }
 
-// UPDATE
+// 🔥 FUEGO (ESTABLE Y CONTROLADO)
+function fire(x,y){
+
+ let dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+
+ for(let d of dirs){
+  let nx=x+d[0], ny=y+d[1];
+  let n=get(nx,ny);
+
+  if(n==="sand" || n==="stone"){
+   if(Math.random()<0.02){
+    set(nx,ny,"fire");
+   }
+  }
+
+  if(n==="water"){
+   set(nx,ny,"steam");
+  }
+ }
+
+ if(Math.random()<0.03){
+  set(x,y,"smoke");
+ }
+
+ if(Math.random()<0.01){
+  set(x,y,null);
+ }
+}
+
+// 🌍 UPDATE
 function update(){
 
- for(let y=rows-2;y>=0;y--){
-  for(let x=0;x<cols;x++){
+ for(let y=rows-2;y>=1;y--){
+  for(let x=1;x<cols-1;x++){
 
-   let cell = grid[x][y];
-   if(!cell) continue;
+   if(wall[x][y]) continue;
 
-   let below = get(x,y+1);
+   let c=g[x][y];
+   if(!c) continue;
 
-   // ARENA
-   if(cell==="sand"){
+   let below=get(x,y+1);
+
+   // 🧱 arena
+   if(c==="sand"){
     if(!below){
      set(x,y+1,"sand");
      set(x,y,null);
     } else {
      let d=Math.random()<0.5?-1:1;
-     if(!get(x+d,y+1)){
+     if(get(x+d,y+1)==null){
       set(x+d,y+1,"sand");
       set(x,y,null);
      }
     }
    }
 
-   // AGUA
-   if(cell==="water"){
+   // 🌊 agua
+   if(c==="water"){
     if(!below){
      set(x,y+1,"water");
      set(x,y,null);
     } else {
      let d=Math.random()<0.5?-1:1;
-     if(!get(x+d,y)){
+     if(get(x+d,y)==null){
       set(x+d,y,"water");
       set(x,y,null);
      }
     }
    }
 
-   // LAVA
-   if(cell==="lava"){
+   // 🪨 PIEDRA (FIX: NO CAE NUNCA)
+   if(c==="stone"){
+    continue;
+   }
+
+   // 🌋 lava
+   if(c==="lava"){
     if(!below){
      set(x,y+1,"lava");
      set(x,y,null);
     } else {
      let d=Math.random()<0.5?-1:1;
-     if(!get(x+d,y)){
+     if(get(x+d,y)==null){
       set(x+d,y,"lava");
       set(x,y,null);
      }
@@ -194,33 +250,28 @@ function update(){
 
     if(get(x,y+1)==="water"){
      set(x,y+1,"stone");
-     set(x,y,"stone");
-    }
-
-    if(Math.random()<0.01){
-     set(x,y,"fire");
     }
    }
 
-   // FUEGO
-   if(cell==="fire"){
-    if(Math.random()<0.1){
-     set(x,y,"smoke");
-    }
+   // 🔥 fuego (FIXED)
+   if(c==="fire"){
+    fire(x,y);
    }
 
-   // HUMO
-   if(cell==="smoke"){
+   // 🌫️ humo
+   if(c==="smoke"){
     if(!get(x,y-1)){
      set(x,y-1,"smoke");
+     set(x,y,null);
+    } else if(Math.random()<0.02){
      set(x,y,null);
     }
    }
 
-   // ELECTRICIDAD
-   if(cell==="electric"){
+   // ⚡ electricidad
+   if(c==="electric"){
     electric(x,y);
-    if(Math.random()<0.05){
+    if(Math.random()<0.04){
      set(x,y,null);
     }
    }
@@ -229,7 +280,7 @@ function update(){
  }
 }
 
-// DRAW
+// 🎨 DRAW
 function draw(){
 
  ctx.fillStyle="#0f0f1a";
@@ -238,24 +289,31 @@ function draw(){
  for(let x=0;x<cols;x++){
   for(let y=0;y<rows;y++){
 
-   let v = grid[x][y];
+   if(wall[x][y]){
+    ctx.fillStyle="#1b1b2a";
+    ctx.fillRect(x*s,y*s,s,s);
+    continue;
+   }
+
+   let v=g[x][y];
    if(!v) continue;
 
-   ctx.fillStyle =
+   ctx.fillStyle=
     v==="sand"?"#d2b48c":
     v==="water"?"cyan":
     v==="lava"?"orange":
     v==="fire"?"red":
-    v==="smoke"?"rgba(200,200,200,0.4)":
+    v==="smoke"?"rgba(200,200,200,0.35)":
+    v==="steam"?"rgba(180,180,255,0.35)":
     v==="electric"?"yellow":
-    v==="stone"?"gray":"white";
+    v==="stone"?"#4a4a4a":"white";
 
    ctx.fillRect(x*s,y*s,s,s);
   }
  }
 }
 
-// TOOL
+// 🖱️ TOOL
 setInterval(()=>{
 
  if(!mouse.down) return;
@@ -263,18 +321,20 @@ setInterval(()=>{
  let gx=Math.floor(mouse.x/s);
  let gy=Math.floor(mouse.y/s);
 
- if(mode==="bomb"){
-  explode(gx,gy,15);
-  return;
- }
+ for(let i=-brush;i<=brush;i++){
+  for(let j=-brush;j<=brush;j++){
 
- for(let i=-size;i<=size;i++){
-  for(let j=-size;j<=size;j++){
+   let x=gx+i, y=gy+j;
+
+   if(wall[x]?.[y]) continue;
 
    if(mode==="erase"){
-    set(gx+i,gy+j,null);
+    set(x,y,null);
+   } else if(mode==="bomb"){
+    explode(gx,gy,18);
+    return;
    } else {
-    set(gx+i,gy+j,mode);
+    set(x,y,mode);
    }
 
   }
@@ -290,6 +350,7 @@ function loop(){
 }
 loop();
 
+})();
 </script>
 
 </body>
