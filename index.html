@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>The Physics Web v27</title>
+<title>The Physics Web v28</title>
 
 <style>
 body { margin:0; overflow:hidden; background:#0f0f1a; font-family:Arial; }
@@ -23,13 +23,24 @@ h1{
  right:10px;
  color:white;
  font-size:18px;
+ margin:0;
+}
+
+#credit{
+ position:fixed;
+ top:40px;
+ right:10px;
+ color:white;
+ font-size:12px;
+ opacity:0.7;
 }
 </style>
 </head>
 
 <body>
 
-<h1>THE PHYSICS WEB v27</h1>
+<h1>THE PHYSICS WEB v28</h1>
+<div id="credit">Made by a guy named Martí</div>
 
 <div id="ui">
 <select id="mode">
@@ -154,15 +165,14 @@ function electric(x,y){
  let dirs=[[1,0],[-1,0],[0,1],[0,-1]];
  for(let d of dirs){
   let nx=x+d[0], ny=y+d[1];
-  if(get(nx,ny) && Math.random()<0.12){
+  if(get(nx,ny) && get(nx,ny)!=="wall" && Math.random()<0.15){
    set(nx,ny,"electric");
   }
  }
 }
 
-// 🔥 FUEGO (ESTABLE Y CONTROLADO)
+// 🔥 FUEGO
 function fire(x,y){
-
  let dirs=[[1,0],[-1,0],[0,1],[0,-1]];
 
  for(let d of dirs){
@@ -230,7 +240,7 @@ function update(){
     }
    }
 
-   // 🪨 PIEDRA (FIX: NO CAE NUNCA)
+   // 🪨 piedra (NO CAE)
    if(c==="stone"){
     continue;
    }
@@ -253,7 +263,7 @@ function update(){
     }
    }
 
-   // 🔥 fuego (FIXED)
+   // 🔥 fuego
    if(c==="fire"){
     fire(x,y);
    }
