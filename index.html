@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>The Physics Web v28</title>
+<title>The Physics Web v29.3</title>
 
 <style>
 body { margin:0; overflow:hidden; background:#0f0f1a; font-family:Arial; }
@@ -21,9 +21,9 @@ h1{
  position:fixed;
  top:10px;
  right:10px;
+ margin:0;
  color:white;
  font-size:18px;
- margin:0;
 }
 
 #credit{
@@ -39,7 +39,7 @@ h1{
 
 <body>
 
-<h1>THE PHYSICS WEB v28</h1>
+<h1>THE PHYSICS WEB v29.3</h1>
 <div id="credit">Made by a guy named Martí</div>
 
 <div id="ui">
@@ -48,17 +48,20 @@ h1{
 <option value="water">Agua</option>
 <option value="lava">Lava</option>
 <option value="stone">🪨 Piedra</option>
+<option value="plant">🌱 Planta</option>
+<option value="sponge">🧽 Esponja</option>
 <option value="fire">🔥 Fuego</option>
 <option value="electric">⚡ Electricidad</option>
-<option value="bomb">💣 Bomba</option>
-<option value="erase">🧽 Borrar</option>
+<option value="erase">Borrar</option>
 </select>
 
 <br><br>
 Tamaño:
-<input id="size" type="range" min="1" max="8" value="2">
+<input id="size" type="range" min="1" max="10" value="2">
 
 <br><br>
+<button id="save">Guardar</button>
+<button id="load">Cargar</button>
 <button id="reset">Reset</button>
 </div>
 
@@ -75,17 +78,13 @@ let cols,rows;
 let g;
 let wall;
 
-function resize(){
+// INIT
+function init(){
+ cols=Math.floor(innerWidth/s);
+ rows=Math.floor(innerHeight/s);
+
  c.width=innerWidth;
  c.height=innerHeight;
-}
-resize();
-addEventListener("resize",resize);
-
-// 🧱 INIT
-function init(){
- cols=Math.floor(c.width/s);
- rows=Math.floor(c.height/s);
 
  g=Array.from({length:cols},()=>Array(rows).fill(null));
  wall=Array.from({length:cols},()=>Array(rows).fill(false));
@@ -105,6 +104,15 @@ function init(){
 init();
 
 document.getElementById("reset").onclick=init;
+
+// SAVE / LOAD
+document.getElementById("save").onclick=()=>{
+ localStorage.setItem("world",JSON.stringify(g));
+};
+document.getElementById("load").onclick=()=>{
+ let data=localStorage.getItem("world");
+ if(data) g=JSON.parse(data);
+};
 
 // INPUT
 let mouse={x:0,y:0,down:false};
@@ -127,37 +135,10 @@ function get(x,y){
  if(wall[x][y]) return "wall";
  return g[x][y];
 }
-
 function set(x,y,v){
  if(x<=0||y<=0||x>=cols-1||y>=rows-1) return;
  if(wall[x][y]) return;
  g[x][y]=v;
-}
-
-// 💣 EXPLOSION
-function explode(cx,cy,r){
- for(let x=cx-r;x<cx+r;x++){
-  for(let y=cy-r;y<cy+r;y++){
-
-   let cell=get(x,y);
-   if(cell==="stone") continue;
-
-   let dx=x-cx, dy=y-cy;
-   let d=Math.sqrt(dx*dx+dy*dy);
-
-   if(d<r){
-    let f=(r-d)/r;
-
-    let nx=x+Math.round(dx*f*5);
-    let ny=y+Math.round(dy*f*5);
-
-    if(get(nx,ny)!=="stone"){
-     set(nx,ny,cell);
-     set(x,y,null);
-    }
-   }
-  }
- }
 }
 
 // ⚡ ELECTRICIDAD
@@ -165,58 +146,33 @@ function electric(x,y){
  let dirs=[[1,0],[-1,0],[0,1],[0,-1]];
  for(let d of dirs){
   let nx=x+d[0], ny=y+d[1];
-  if(get(nx,ny) && get(nx,ny)!=="wall" && Math.random()<0.15){
+  let n=get(nx,ny);
+
+  if(n && n!=="wall" && Math.random()<0.2){
    set(nx,ny,"electric");
   }
  }
-}
 
-// 🔥 FUEGO
-function fire(x,y){
- let dirs=[[1,0],[-1,0],[0,1],[0,-1]];
-
- for(let d of dirs){
-  let nx=x+d[0], ny=y+d[1];
-  let n=get(nx,ny);
-
-  if(n==="sand" || n==="stone"){
-   if(Math.random()<0.02){
-    set(nx,ny,"fire");
-   }
-  }
-
-  if(n==="water"){
-   set(nx,ny,"steam");
-  }
- }
-
- if(Math.random()<0.03){
-  set(x,y,"smoke");
- }
-
- if(Math.random()<0.01){
+ if(Math.random()<0.05){
   set(x,y,null);
  }
 }
 
-// 🌍 UPDATE
+// UPDATE
 function update(){
 
  for(let y=rows-2;y>=1;y--){
   for(let x=1;x<cols-1;x++){
-
-   if(wall[x][y]) continue;
 
    let c=g[x][y];
    if(!c) continue;
 
    let below=get(x,y+1);
 
-   // 🧱 arena
+   // 🧱 ARENA
    if(c==="sand"){
     if(!below){
-     set(x,y+1,"sand");
-     set(x,y,null);
+     set(x,y+1,"sand"); set(x,y,null);
     } else {
      let d=Math.random()<0.5?-1:1;
      if(get(x+d,y+1)==null){
@@ -226,26 +182,19 @@ function update(){
     }
    }
 
-   // 🌊 agua
+   // 🌊 AGUA
    if(c==="water"){
     if(!below){
-     set(x,y+1,"water");
-     set(x,y,null);
+     set(x,y+1,"water"); set(x,y,null);
     } else {
      let d=Math.random()<0.5?-1:1;
      if(get(x+d,y)==null){
-      set(x+d,y,"water");
-      set(x,y,null);
+      set(x+d,y,"water"); set(x,y,null);
      }
     }
    }
 
-   // 🪨 piedra (NO CAE)
-   if(c==="stone"){
-    continue;
-   }
-
-   // 🌋 lava
+   // 🌋 LAVA (FIX REAL)
    if(c==="lava"){
     if(!below){
      set(x,y+1,"lava");
@@ -258,39 +207,61 @@ function update(){
      }
     }
 
-    if(get(x,y+1)==="water"){
+    if(below==="water"){
      set(x,y+1,"stone");
+     set(x,y,"smoke");
     }
    }
 
-   // 🔥 fuego
-   if(c==="fire"){
-    fire(x,y);
-   }
-
-   // 🌫️ humo
+   // 🌫️ HUMO
    if(c==="smoke"){
     if(!get(x,y-1)){
-     set(x,y-1,"smoke");
-     set(x,y,null);
-    } else if(Math.random()<0.02){
+     set(x,y-1,"smoke"); set(x,y,null);
+    } else if(Math.random()<0.05){
      set(x,y,null);
     }
    }
 
-   // ⚡ electricidad
+   // 🌱 PLANTA
+   if(c==="plant"){
+    if(Math.random()<0.01 && (below==="sand"||below==="stone")){
+     if(!get(x,y-1)) set(x,y-1,"plant");
+    }
+   }
+
+   // 🔥 FUEGO
+   if(c==="fire"){
+    let dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+    for(let d of dirs){
+     let n=get(x+d[0],y+d[1]);
+     if(n==="plant") set(x+d[0],y+d[1],"fire");
+     if(n==="water") set(x+d[0],y+d[1],"smoke");
+    }
+    if(Math.random()<0.05) set(x,y,null);
+   }
+
+   // 🧽 ESPONJA
+   if(c==="sponge"){
+    for(let dx=-2;dx<=2;dx++){
+     for(let dy=-2;dy<=2;dy++){
+      let n=get(x+dx,y+dy);
+      if(n==="water"||n==="lava"){
+       set(x+dx,y+dy,null);
+      }
+     }
+    }
+   }
+
+   // ⚡ ELECTRICIDAD
    if(c==="electric"){
     electric(x,y);
-    if(Math.random()<0.04){
-     set(x,y,null);
-    }
    }
 
   }
  }
 }
 
-// 🎨 DRAW
+// DRAW
 function draw(){
 
  ctx.fillStyle="#0f0f1a";
@@ -300,7 +271,7 @@ function draw(){
   for(let y=0;y<rows;y++){
 
    if(wall[x][y]){
-    ctx.fillStyle="#1b1b2a";
+    ctx.fillStyle="#222";
     ctx.fillRect(x*s,y*s,s,s);
     continue;
    }
@@ -312,18 +283,19 @@ function draw(){
     v==="sand"?"#d2b48c":
     v==="water"?"cyan":
     v==="lava"?"orange":
+    v==="stone"?"#444":
+    v==="plant"?"green":
+    v==="sponge"?"yellow":
     v==="fire"?"red":
-    v==="smoke"?"rgba(200,200,200,0.35)":
-    v==="steam"?"rgba(180,180,255,0.35)":
     v==="electric"?"yellow":
-    v==="stone"?"#4a4a4a":"white";
+    v==="smoke"?"rgba(200,200,200,0.3)":"white";
 
    ctx.fillRect(x*s,y*s,s,s);
   }
  }
 }
 
-// 🖱️ TOOL
+// TOOL
 setInterval(()=>{
 
  if(!mouse.down) return;
@@ -340,9 +312,6 @@ setInterval(()=>{
 
    if(mode==="erase"){
     set(x,y,null);
-   } else if(mode==="bomb"){
-    explode(gx,gy,18);
-    return;
    } else {
     set(x,y,mode);
    }
