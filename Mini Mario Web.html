@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mini Mario v4 GOD FIX v5</title>
+
+<style>
+body {
+ margin:0;
+ overflow:hidden;
+ font-family:Arial;
+ background:#87ceeb;
+}
+
+canvas { display:block; }
+
+#menu{
+ position:fixed;
+ inset:0;
+ background:rgba(0,0,0,0.85);
+ display:flex;
+ flex-direction:column;
+ align-items:center;
+ justify-content:center;
+ color:white;
+}
+
+button{
+ padding:10px 20px;
+ margin:10px;
+ font-size:18px;
+ cursor:pointer;
+}
+
+#shop{
+ position:fixed;
+ bottom:10px;
+ left:10px;
+ background:rgba(0,0,0,0.8);
+ color:white;
+ padding:10px;
+ border-radius:10px;
+ display:none;
+}
+
+#hud{
+ position:fixed;
+ top:10px;
+ right:10px;
+ color:white;
+ background:rgba(0,0,0,0.5);
+ padding:6px 10px;
+ border-radius:8px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="menu">
+ <h1>MINI MARIO v4 GOD FIX v5</h1>
+ <button onclick="startGame()">JUGAR</button>
+</div>
+
+<div id="shop">
+🛒 TIENDA<br>
+<button onclick="setColor('red')">Rojo</button>
+<button onclick="setColor('blue')">Azul</button>
+<button onclick="setColor('purple')">Morado</button>
+<br><br>
+<button onclick="toggleShop()">Cerrar</button>
+</div>
+
+<div id="hud">Nivel: 1</div>
+
+<canvas id="c"></canvas>
+
+<script>
+const c=document.getElementById("c");
+const ctx=c.getContext("2d");
+
+c.width=innerWidth;
+c.height=innerHeight;
+
+// =====================
+// STATE
+// =====================
+let levelIndex=0;
+let player;
+let spawnFloor;
+let flag;
+let playerColor="red";
+
+// =====================
+// LEVELS
+// =====================
+const levels=[
+ [
+  {x:200,y:480,w:200,h:20},
+  {x:500,y:430,w:200,h:20},
+  {x:800,y:380,w:200,h:20},
+ ],
+ [
+  {x:200,y:480,w:200,h:20},
+  {x:500,y:440,w:200,h:20},
+  {x:800,y:400,w:200,h:20},
+  {x:1100,y:360,w:200,h:20}
+ ],
+ [
+  {x:200,y:480,w:200,h:20},
+  {x:500,y:450,w:200,h:20},
+  {x:800,y:410,w:200,h:20},
+  {x:1100,y:370,w:200,h:20},
+  {x:1400,y:330,w:200,h:20}
+ ],
+ [
+  {x:200,y:480,w:200,h:20},
+  {x:500,y:460,w:200,h:20},
+  {x:800,y:420,w:200,h:20},
+  {x:1100,y:380,w:200,h:20},
+  {x:1400,y:340,w:200,h:20}
+ ],
+ [
+  {x:200,y:470,w:200,h:20},
+  {x:500,y:440,w:200,h:20},
+  {x:800,y:400,w:200,h:20},
+  {x:1100,y:360,w:200,h:20},
+  {x:1400,y:320,w:200,h:20}
+ ]
+];
+
+// 👾 enemigos
+let enemies=[];
+
+// =====================
+// INPUT
+// =====================
+let keys={};
+
+addEventListener("keydown",e=>keys[e.code]=true);
+addEventListener("keyup",e=>keys[e.code]=false);
+
+// =====================
+// START
+// =====================
+function startGame(){
+ document.getElementById("menu").style.display="none";
+ loadLevel(0);
+}
+
+// =====================
+// LOAD LEVEL
+// =====================
+function loadLevel(i){
+
+ levelIndex=i;
+
+ spawnFloor={
+  x:0,
+  y:550,
+  w:5000,
+  h:100
+ };
+
+ player={
+  x:120,
+  y:spawnFloor.y-30,
+  w:30,
+  h:30,
+  vx:0,
+  vy:0,
+  speed:4,
+  jump:-12,
+  grounded:false
+ };
+
+ enemies=[
+  {x:500,y:430,w:30,h:30,vx:2},
+  {x:900,y:380,w:30,h:30,vx:-2}
+ ];
+
+ // 🏁 FLAG (FINAL DEL NIVEL)
+ flag={
+  x:levels[i][levels[i].length-1].x + 120,
+  y:levels[i][levels[i].length-1].y - 80,
+  w:20,
+  h:80
+ };
+
+ document.getElementById("hud").innerText="Nivel: "+(i+1);
+}
+
+// =====================
+// SHOP
+// =====================
+function toggleShop(){
+ let s=document.getElementById("shop");
+ s.style.display = s.style.display==="none"?"block":"none";
+}
+
+function setColor(c){
+ playerColor=c;
+}
+
+// =====================
+// PHYSICS
+// =====================
+const gravity=0.6;
+
+function collide(a,b){
+ return (
+  a.x < b.x + b.w &&
+  a.x + a.w > b.x &&
+  a.y < b.y + b.h &&
+  a.y + a.h > b.y
+ );
+}
+
+// RESET
+function reset(){
+ player.x=120;
+ player.y=spawnFloor.y-player.h;
+ player.vx=0;
+ player.vy=0;
+}
+
+// =====================
+// UPDATE
+// =====================
+function update(){
+
+ let platforms = levels[levelIndex].concat([spawnFloor]);
+
+ player.vx=0;
+
+ if(keys["ArrowLeft"]||keys["KeyA"]) player.vx=-player.speed;
+ if(keys["ArrowRight"]||keys["KeyD"]) player.vx=player.speed;
+
+ if((keys["Space"]||keys["ArrowUp"]||keys["KeyW"]) && player.grounded){
+  player.vy=player.jump;
+  player.grounded=false;
+ }
+
+ player.vy+=gravity;
+
+ player.x+=player.vx;
+
+ for(let p of platforms){
+  if(collide(player,p)){
+   if(player.vx>0) player.x=p.x-player.w;
+   if(player.vx<0) player.x=p.x+p.w;
+  }
+ }
+
+ player.y+=player.vy;
+ player.grounded=false;
+
+ for(let p of platforms){
+  if(collide(player,p)){
+   if(player.vy>0){
+    player.y=p.y-player.h;
+    player.vy=0;
+    player.grounded=true;
+   }
+   if(player.vy<0){
+    player.y=p.y+p.h;
+    player.vy=0;
+   }
+  }
+ }
+
+ // 👾 enemigos
+ for(let e of enemies){
+  e.x+=e.vx;
+  if(e.x<100||e.x>2000) e.vx*=-1;
+
+  if(collide(player,e)) reset();
+ }
+
+ // 🏁 FINISH LOGIC
+ if(collide(player,flag)){
+  if(levelIndex < levels.length-1){
+   loadLevel(levelIndex+1);
+  } else {
+   alert("🏆 HAS COMPLETADO TODOS LOS NIVELES!");
+   document.getElementById("menu").style.display="flex";
+  }
+ }
+
+ if(player.y>800) reset();
+}
+
+// =====================
+// DRAW
+// =====================
+function draw(){
+
+ ctx.fillStyle="#87ceeb";
+ ctx.fillRect(0,0,c.width,c.height);
+
+ let platforms = levels[levelIndex].concat([spawnFloor]);
+
+ ctx.fillStyle="green";
+ for(let p of platforms){
+  ctx.fillRect(p.x,p.y,p.w,p.h);
+ }
+
+ // 👾 enemigos
+ ctx.fillStyle="purple";
+ for(let e of enemies){
+  ctx.fillRect(e.x,e.y,e.w,e.h);
+ }
+
+ // 🏁 bandera final
+ ctx.fillStyle="gold";
+ ctx.fillRect(flag.x,flag.y,flag.w,flag.h);
+
+ // jugador
+ ctx.fillStyle=playerColor;
+ ctx.fillRect(player.x,player.y,player.w,player.h);
+
+ ctx.fillStyle="black";
+ ctx.fillText("Nivel: "+(levelIndex+1),20,20);
+}
+
+// LOOP
+function loop(){
+ if(player){
+  update();
+  draw();
+ }
+ requestAnimationFrame(loop);
+}
+loop();
+
+</script>
+
+</body>
+</html>
