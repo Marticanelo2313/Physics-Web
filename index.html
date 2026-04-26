@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>The Physics Web v29.6</title>
+<title>The Physics Web v29.7</title>
 
 <style>
 body { margin:0; overflow:hidden; background:#0f0f1a; font-family:Arial; }
@@ -23,7 +23,7 @@ h1{
  right:10px;
  margin:0;
  color:white;
- font-size:18px;
+ font-size:16px;
 }
 
 #credit{
@@ -39,7 +39,7 @@ h1{
 
 <body>
 
-<h1>THE PHYSICS WEB v29.6</h1>
+<h1>THE PHYSICS WEB v29.7</h1>
 <div id="credit">Made by a guy named Martí</div>
 
 <div id="ui">
@@ -79,10 +79,13 @@ let cols,rows;
 let g;
 let wall;
 
-// ⏱️ CONTROL LLUVIA
+// 🌗 DÍA/NOCHE
+let dayTime=0;
+
+// LLUVIA (igual que v29.6)
 let rainActive=false;
 let rainTimer=0;
-let rainCooldown=0;
+let rainCooldown=120000;
 
 // FPS
 let lastTime=0;
@@ -114,7 +117,7 @@ function init(){
 
  rainActive=false;
  rainTimer=0;
- rainCooldown=120000; // empieza sin lluvia (2 min)
+ rainCooldown=120000;
 }
 init();
 
@@ -156,28 +159,26 @@ function set(x,y,v){
  g[x][y]=v;
 }
 
-// 🌧️ LLUVIA CONTROLADA
+// 🌧️ LLUVIA CONTROLADA (igual)
 function handleRain(delta){
 
  if(rainActive){
   rainTimer += delta;
 
-  // lluvia ligera
   for(let i=0;i<cols;i+=12){
    if(Math.random()<0.1){
     set(i,1,"water");
    }
   }
 
-  if(rainTimer > 5000){ // 5 segundos
+  if(rainTimer > 5000){
    rainActive=false;
    rainTimer=0;
-   rainCooldown=120000; // 2 min
+   rainCooldown=120000;
   }
 
  } else {
   rainCooldown -= delta;
-
   if(rainCooldown <= 0){
    rainActive=true;
   }
@@ -223,6 +224,7 @@ function growPlant(x,y){
 function update(delta){
 
  handleRain(delta);
+ dayTime += delta * 0.00005;
 
  for(let y=rows-2;y>=1;y--){
   for(let x=1;x<cols-1;x++){
@@ -232,6 +234,21 @@ function update(delta){
 
    let below=get(x,y+1);
 
+   // 🧪 FUSIONES
+
+   // agua + arena → arena mojada
+   if(c==="sand" && below==="water"){
+    set(x,y,"wet_sand");
+   }
+
+   // lava + agua → piedra + humo
+   if(c==="lava" && below==="water"){
+    set(x,y,"stone");
+    set(x,y+1,"stone");
+    if(!get(x,y-1)) set(x,y-1,"smoke");
+   }
+
+   // ARENA
    if(c==="sand"){
     if(!below){
      set(x,y+1,"sand"); set(x,y,null);
@@ -243,6 +260,7 @@ function update(delta){
     }
    }
 
+   // TIERRA
    if(c==="dirt"){
     if(!below){
      set(x,y+1,"dirt"); set(x,y,null);
@@ -254,6 +272,7 @@ function update(delta){
     }
    }
 
+   // AGUA
    if(c==="water"){
     if(!below){
      set(x,y+1,"water"); set(x,y,null);
@@ -265,6 +284,7 @@ function update(delta){
     }
    }
 
+   // LAVA
    if(c==="lava"){
     if(!below){
      set(x,y+1,"lava"); set(x,y,null);
@@ -274,13 +294,9 @@ function update(delta){
       set(x+d,y,"lava"); set(x,y,null);
      }
     }
-
-    if(below==="water"){
-     set(x,y+1,"stone");
-     set(x,y,"smoke");
-    }
    }
 
+   // HUMO
    if(c==="smoke"){
     if(!get(x,y-1)){
      set(x,y-1,"smoke"); set(x,y,null);
@@ -289,10 +305,12 @@ function update(delta){
     }
    }
 
+   // PLANTA
    if(c==="plant"){
     growPlant(x,y);
    }
 
+   // FUEGO
    if(c==="fire"){
     let dirs=[[1,0],[-1,0],[0,1],[0,-1]];
     for(let d of dirs){
@@ -303,6 +321,7 @@ function update(delta){
     if(Math.random()<0.05) set(x,y,null);
    }
 
+   // ESPONJA
    if(c==="sponge"){
     for(let dx=-2;dx<=2;dx++){
      for(let dy=-2;dy<=2;dy++){
@@ -314,6 +333,7 @@ function update(delta){
     }
    }
 
+   // ELECTRICIDAD
    if(c==="electric"){
     electric(x,y);
    }
@@ -324,7 +344,10 @@ function update(delta){
 
 // DRAW
 function draw(){
- ctx.fillStyle="#0f0f1a";
+
+ // 🌗 iluminación
+ let b = Math.sin(dayTime)*0.5+0.5;
+ ctx.fillStyle=`rgb(${20+50*b},${20+50*b},${40+80*b})`;
  ctx.fillRect(0,0,c.width,c.height);
 
  for(let x=0;x<cols;x++){
@@ -341,6 +364,7 @@ function draw(){
 
    ctx.fillStyle=
     v==="sand"?"#d2b48c":
+    v==="wet_sand"?"#a58b6f":
     v==="dirt"?"#8b5a2b":
     v==="water"?"cyan":
     v==="lava"?"orange":
@@ -365,7 +389,9 @@ setInterval(()=>{
 
  for(let i=-brush;i<=brush;i++){
   for(let j=-brush;j<=brush;j++){
+
    let x=gx+i, y=gy+j;
+
    if(wall[x]?.[y]) continue;
 
    if(mode==="erase"){
@@ -373,8 +399,10 @@ setInterval(()=>{
    } else {
     set(x,y,mode);
    }
+
   }
  }
+
 },16);
 
 // LOOP
