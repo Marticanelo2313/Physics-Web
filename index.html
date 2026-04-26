@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>The Physics Web v29.3</title>
+<title>The Physics Web v29.6</title>
 
 <style>
 body { margin:0; overflow:hidden; background:#0f0f1a; font-family:Arial; }
@@ -39,12 +39,13 @@ h1{
 
 <body>
 
-<h1>THE PHYSICS WEB v29.3</h1>
+<h1>THE PHYSICS WEB v29.6</h1>
 <div id="credit">Made by a guy named Martí</div>
 
 <div id="ui">
 <select id="mode">
 <option value="sand">Arena</option>
+<option value="dirt">🌍 Tierra</option>
 <option value="water">Agua</option>
 <option value="lava">Lava</option>
 <option value="stone">🪨 Piedra</option>
@@ -78,6 +79,16 @@ let cols,rows;
 let g;
 let wall;
 
+// ⏱️ CONTROL LLUVIA
+let rainActive=false;
+let rainTimer=0;
+let rainCooldown=0;
+
+// FPS
+let lastTime=0;
+const fpsLimit=60;
+const interval=1000/fpsLimit;
+
 // INIT
 function init(){
  cols=Math.floor(innerWidth/s);
@@ -100,6 +111,10 @@ function init(){
  for(let x=1;x<cols-1;x++){
   g[x][rows-2]="stone";
  }
+
+ rainActive=false;
+ rainTimer=0;
+ rainCooldown=120000; // empieza sin lluvia (2 min)
 }
 init();
 
@@ -141,6 +156,34 @@ function set(x,y,v){
  g[x][y]=v;
 }
 
+// 🌧️ LLUVIA CONTROLADA
+function handleRain(delta){
+
+ if(rainActive){
+  rainTimer += delta;
+
+  // lluvia ligera
+  for(let i=0;i<cols;i+=12){
+   if(Math.random()<0.1){
+    set(i,1,"water");
+   }
+  }
+
+  if(rainTimer > 5000){ // 5 segundos
+   rainActive=false;
+   rainTimer=0;
+   rainCooldown=120000; // 2 min
+  }
+
+ } else {
+  rainCooldown -= delta;
+
+  if(rainCooldown <= 0){
+   rainActive=true;
+  }
+ }
+}
+
 // ⚡ ELECTRICIDAD
 function electric(x,y){
  let dirs=[[1,0],[-1,0],[0,1],[0,-1]];
@@ -152,14 +195,34 @@ function electric(x,y){
    set(nx,ny,"electric");
   }
  }
-
  if(Math.random()<0.05){
   set(x,y,null);
  }
 }
 
+// 🌱 IA PLANTA
+function growPlant(x,y){
+ let hasWater=false;
+
+ for(let dx=-2;dx<=2;dx++){
+  for(let dy=-2;dy<=2;dy++){
+   if(get(x+dx,y+dy)==="water"){
+    hasWater=true;
+   }
+  }
+ }
+
+ if(hasWater && Math.random()<0.02){
+  if(!get(x,y-1)){
+   set(x,y-1,"plant");
+  }
+ }
+}
+
 // UPDATE
-function update(){
+function update(delta){
+
+ handleRain(delta);
 
  for(let y=rows-2;y>=1;y--){
   for(let x=1;x<cols-1;x++){
@@ -169,20 +232,28 @@ function update(){
 
    let below=get(x,y+1);
 
-   // 🧱 ARENA
    if(c==="sand"){
     if(!below){
      set(x,y+1,"sand"); set(x,y,null);
     } else {
      let d=Math.random()<0.5?-1:1;
      if(get(x+d,y+1)==null){
-      set(x+d,y+1,"sand");
-      set(x,y,null);
+      set(x+d,y+1,"sand"); set(x,y,null);
      }
     }
    }
 
-   // 🌊 AGUA
+   if(c==="dirt"){
+    if(!below){
+     set(x,y+1,"dirt"); set(x,y,null);
+    } else if(Math.random()<0.3){
+     let d=Math.random()<0.5?-1:1;
+     if(get(x+d,y+1)==null){
+      set(x+d,y+1,"dirt"); set(x,y,null);
+     }
+    }
+   }
+
    if(c==="water"){
     if(!below){
      set(x,y+1,"water"); set(x,y,null);
@@ -194,16 +265,13 @@ function update(){
     }
    }
 
-   // 🌋 LAVA (FIX REAL)
    if(c==="lava"){
     if(!below){
-     set(x,y+1,"lava");
-     set(x,y,null);
+     set(x,y+1,"lava"); set(x,y,null);
     } else {
      let d=Math.random()<0.5?-1:1;
      if(get(x+d,y)==null){
-      set(x+d,y,"lava");
-      set(x,y,null);
+      set(x+d,y,"lava"); set(x,y,null);
      }
     }
 
@@ -213,7 +281,6 @@ function update(){
     }
    }
 
-   // 🌫️ HUMO
    if(c==="smoke"){
     if(!get(x,y-1)){
      set(x,y-1,"smoke"); set(x,y,null);
@@ -222,14 +289,10 @@ function update(){
     }
    }
 
-   // 🌱 PLANTA
    if(c==="plant"){
-    if(Math.random()<0.01 && (below==="sand"||below==="stone")){
-     if(!get(x,y-1)) set(x,y-1,"plant");
-    }
+    growPlant(x,y);
    }
 
-   // 🔥 FUEGO
    if(c==="fire"){
     let dirs=[[1,0],[-1,0],[0,1],[0,-1]];
     for(let d of dirs){
@@ -240,7 +303,6 @@ function update(){
     if(Math.random()<0.05) set(x,y,null);
    }
 
-   // 🧽 ESPONJA
    if(c==="sponge"){
     for(let dx=-2;dx<=2;dx++){
      for(let dy=-2;dy<=2;dy++){
@@ -252,7 +314,6 @@ function update(){
     }
    }
 
-   // ⚡ ELECTRICIDAD
    if(c==="electric"){
     electric(x,y);
    }
@@ -263,7 +324,6 @@ function update(){
 
 // DRAW
 function draw(){
-
  ctx.fillStyle="#0f0f1a";
  ctx.fillRect(0,0,c.width,c.height);
 
@@ -281,10 +341,11 @@ function draw(){
 
    ctx.fillStyle=
     v==="sand"?"#d2b48c":
+    v==="dirt"?"#8b5a2b":
     v==="water"?"cyan":
     v==="lava"?"orange":
     v==="stone"?"#444":
-    v==="plant"?"green":
+    v==="plant"?"#00aa00":
     v==="sponge"?"yellow":
     v==="fire"?"red":
     v==="electric"?"yellow":
@@ -297,7 +358,6 @@ function draw(){
 
 // TOOL
 setInterval(()=>{
-
  if(!mouse.down) return;
 
  let gx=Math.floor(mouse.x/s);
@@ -305,9 +365,7 @@ setInterval(()=>{
 
  for(let i=-brush;i<=brush;i++){
   for(let j=-brush;j<=brush;j++){
-
    let x=gx+i, y=gy+j;
-
    if(wall[x]?.[y]) continue;
 
    if(mode==="erase"){
@@ -315,17 +373,21 @@ setInterval(()=>{
    } else {
     set(x,y,mode);
    }
-
   }
  }
-
 },16);
 
 // LOOP
-function loop(){
- update();
- draw();
+function loop(t){
  requestAnimationFrame(loop);
+
+ let delta = t - lastTime;
+ if(delta < interval) return;
+
+ lastTime = t;
+
+ update(delta);
+ draw();
 }
 loop();
 
